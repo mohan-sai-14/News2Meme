@@ -21,5 +21,11 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // This helps with client-side routing in SPA
+      if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/api/')) {
+        window.history.replaceState('', '', '/');
+      }
+    </script>
   </body>
 </html>
