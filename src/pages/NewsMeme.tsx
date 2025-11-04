@@ -260,10 +260,7 @@ const NewsMeme = () => {
         apiUrl += `&country=${country.toLowerCase()}`;
       }
 
-      console.log('Fetching news from:', apiUrl);
       
-      console.log('Making API request to:', apiUrl);
-      console.log('Making API request to:', apiUrl);
       const response = await fetch(apiUrl, {
         headers: {
           'Accept': 'application/json',
