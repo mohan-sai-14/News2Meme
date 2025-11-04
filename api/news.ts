@@ -1,47 +1,105 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const {
-    q = '',
-    category = 'general',
-    country = 'us',
-    page = '1',
-    pageSize = '6'
-  } = req.query;
+interface GNewsArticle {
+  title: string;
+  description: string;
+  content: string;
+  url: string;
+  image: string;
+  publishedAt: string;
+  source: {
+    name: string;
+    url: string;
+  };
+}
 
-  const GNEWS_API_KEY = process.env.GNEWS_API_KEY;
-  
-  if (!GNEWS_API_KEY) {
-    return res.status(500).json({ error: 'Server configuration error' });
+interface GNewsResponse {
+  articles: GNewsArticle[];
+  totalArticles: number;
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Content-Type', 'application/json');
+
+  // Handle OPTIONS request for CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.status(200).end();
   }
 
   try {
+    const {
+      q = '',
+      category = 'general',
+      country = 'us',
+      page = '1',
+      pageSize = '6'
+    } = req.query;
+
+    const GNEWS_API_KEY = process.env.GNEWS_API_KEY;
+    
+    if (!GNEWS_API_KEY) {
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
     // Build the GNews API URL
-    let apiUrl = `https://gnews.io/api/v4/top-headlines?apikey=${GNEWS_API_KEY}&lang=en&max=${pageSize}&page=${page}`;
+    let apiUrl = new URL('https://gnews.io/api/v4/top-headlines');
+    apiUrl.searchParams.append('apikey', GNEWS_API_KEY);
+    apiUrl.searchParams.append('lang', 'en');
+    apiUrl.searchParams.append('max', pageSize as string);
+    apiUrl.searchParams.append('page', page as string);
     
     // Add filters if provided
     if (q) {
-      apiUrl += `&q=${encodeURIComponent(q as string)}`;
+      apiUrl.searchParams.append('q', q as string);
     }
     if (category && category !== 'all') {
-      apiUrl += `&category=${category}`;
+      apiUrl.searchParams.append('category', (category as string).toLowerCase());
     }
     if (country) {
-      apiUrl += `&country=${country}`;
+      apiUrl.searchParams.append('country', (country as string).toLowerCase());
     }
 
-    const response = await fetch(apiUrl);
-    const data = await response.json();
-
+    console.log('Fetching from GNews API:', apiUrl.toString());
+    const response = await fetch(apiUrl.toString());
+    
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('GNews API Error:', errorText);
       return res.status(response.status).json({ 
-        error: data.message || 'Failed to fetch news' 
+        error: `Failed to fetch news: ${response.statusText}`,
+        details: errorText
       });
     }
 
-    res.status(200).json(data);
+    const data: GNewsResponse = await response.json();
+    
+    // Transform the response to match our frontend's expected format
+    const formattedData = {
+      articles: data.articles?.map(article => ({
+        title: article.title || 'No title available',
+        description: article.description || 'No description available',
+        content: article.content,
+        url: article.url,
+        urlToImage: article.image || 'https://via.placeholder.com/300x150?text=No+Image',
+        publishedAt: article.publishedAt || new Date().toISOString(),
+        source: {
+          name: article.source?.name || 'Unknown source',
+          url: article.source?.url || '#'
+        }
+      })) || [],
+      totalResults: data.totalArticles || 0
+    };
+
+    return res.status(200).json(formattedData);
   } catch (error) {
-    console.error('Error fetching news:', error);
-    res.status(500).json({ error: 'Failed to fetch news' });
+    console.error('Error in news API:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }

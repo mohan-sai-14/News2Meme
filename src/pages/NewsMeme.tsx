@@ -89,17 +89,19 @@ const NewsMeme = () => {
         console.log('Fetching news from:', apiUrl);
         const response = await fetch(apiUrl, {
           headers: {
+            'Accept': 'application/json',
             'Content-Type': 'application/json',
           },
         });
         
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('API Error Response:', errorData);
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
         console.log('API Response:', data);
-
-        if (!response.ok) {
-          console.error('API Error Response:', data);
-          throw new Error(data.error || `HTTP error! status: ${response.status}`);
-        }
 
         if (data && Array.isArray(data.articles)) {
           const formattedHeadlines = data.articles.map((article: any) => ({
@@ -107,7 +109,7 @@ const NewsMeme = () => {
             description: article.description || 'No description available',
             source: article.source?.name || 'Unknown source',
             url: article.url || article.source?.url || '#',
-            urlToImage: article.image || article.urlToImage || 'https://via.placeholder.com/300x150?text=No+Image',
+            urlToImage: article.urlToImage || 'https://via.placeholder.com/300x150?text=No+Image',
             publishedAt: article.publishedAt || new Date().toISOString()
           }));
 
