@@ -26,7 +26,6 @@ interface Article {
   publishedAt: string;
 }
 
-// Move getRandomTemplate function before the component
 const getRandomTemplate = () => {
   const memeTemplates = [
     { id: '181913649', name: 'Drake Hotline Bling', topText: true, bottomText: true },
@@ -52,7 +51,9 @@ const NewsMeme = () => {
   const [currentTemplate, setCurrentTemplate] = useState(getRandomTemplate());
   const [generatedMeme, setGeneratedMeme] = useState('');
   const itemsPerPage = 6;
-  // Memoize the meme templates to prevent recreation on every render
+  
+  const { toast } = useToast();
+
   const memeTemplates = useMemo(() => [
     { id: '181913649', name: 'Drake Hotline Bling', topText: true, bottomText: true },
     { id: '87743020', name: 'Two Buttons', topText: true, bottomText: true },
@@ -65,8 +66,6 @@ const NewsMeme = () => {
     { id: '93895088', name: 'Expanding Brain', topText: true, bottomText: false },
     { id: '155067746', name: 'Surprised Pikachu', topText: true, bottomText: false }
   ], []);
-
-  const { toast } = useToast();
 
   interface NewsApiArticle {
     title: string;
@@ -99,7 +98,7 @@ const NewsMeme = () => {
       const searchQuery = urlParams.get('q') || '';
       const category = urlParams.get('category') || 'all';
       const country = urlParams.get('country') || 'us';
-      const pageSize = 6; // Number of articles per page
+      const pageSize = 6;
 
       // Build our API URL
       const baseUrl = import.meta.env.PROD 
@@ -118,10 +117,8 @@ const NewsMeme = () => {
         apiUrl += `&country=${country.toLowerCase()}`;
       }
 
-      console.log('Fetching news from:', apiUrl);
+      console.log('Making API request to:', apiUrl);
       
-      console.log('Making API request to:', apiUrl);
-      console.log('Making API request to:', apiUrl);
       const response = await fetch(apiUrl, {
         headers: {
           'Accept': 'application/json',
@@ -131,7 +128,6 @@ const NewsMeme = () => {
       
       const responseText = await response.text();
       console.log('API Response Status:', response.status);
-      console.log('API Response Text:', responseText);
       
       if (!response.ok) {
         let errorData;
@@ -161,7 +157,7 @@ const NewsMeme = () => {
         title: article.title || 'No title available',
         description: article.description || 'No description available',
         source: typeof article.source === 'string' ? article.source : article.source?.name || 'Unknown source',
-        url: article.url || article.source?.url || '#',
+        url: article.url || '#',
         urlToImage: article.urlToImage || 'https://via.placeholder.com/300x150?text=No+Image',
         publishedAt: article.publishedAt || new Date().toISOString()
       }));
@@ -226,221 +222,48 @@ const NewsMeme = () => {
     fetchNews();
   }, [fetchNews]);
 
-
-    try {
-      // Set loading state
-      if (loadMore) {
-        setIsLoadingMore(true);
-      } else {
-        setIsLoading(true);
-        setIsLoadingNews(true);
-      }
-
-      // Get URL parameters for filters
-      const urlParams = new URLSearchParams(window.location.search);
-      const searchQuery = urlParams.get('q') || '';
-      const category = urlParams.get('category') || 'all';
-      const country = urlParams.get('country') || 'us';
-      const pageSize = 6; // Number of articles per page
-
-      // Build our API URL
-      const baseUrl = import.meta.env.PROD 
-        ? 'https://news2meme.vercel.app' 
-        : '';
-      let apiUrl = `${baseUrl}/api/news?page=${currentPage}&pageSize=${pageSize}`;
-      
-      // Add filters if provided
-      if (searchQuery) {
-        apiUrl += `&q=${encodeURIComponent(searchQuery)}`;
-      }
-      if (category && category !== 'all' && category !== 'All') {
-        apiUrl += `&category=${category.toLowerCase()}`;
-      }
-      if (country) {
-        apiUrl += `&country=${country.toLowerCase()}`;
-      }
-
-      
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      const responseText = await response.text();
-      console.log('API Response Status:', response.status);
-      console.log('API Response Text:', responseText);
-      
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = JSON.parse(responseText);
-          console.error('API Error:', errorData);
-          throw new Error(
-            errorData.message || 
-            errorData.error?.message || 
-            `API request failed with status ${response.status}`
-          );
-        } catch (e) {
-          console.error('Failed to parse error response:', e);
-          throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
-        }
-      }
-      
-      const data = JSON.parse(responseText);
-      
-      if (!data.articles || !Array.isArray(data.articles)) {
-        console.error('Invalid response format:', data);
-        throw new Error('Invalid response format from server');
-      }
-
-      // Process the articles
-      const formattedHeadlines = data.articles.map(article => ({
-        title: article.title || 'No title available',
-        description: article.description || 'No description available',
-        source: article.source?.name || 'Unknown source',
-        url: article.url || article.source?.url || '#',
-        urlToImage: article.urlToImage || 'https://via.placeholder.com/300x150?text=No+Image',
-        publishedAt: article.publishedAt || new Date().toISOString()
-      }));
-
-      if (loadMore) {
-        setHeadlines(prev => [...prev, ...formattedHeadlines]);
-        setPage(currentPage);
-      } else {
-        setHeadlines(formattedHeadlines);
-      }
-      
-      setHasMore(formattedHeadlines.length === pageSize);
-      return;
-      
-    } catch (error) {
-      console.error('Error in fetchNews:', error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : typeof error === 'string' 
-          ? error 
-          : 'Unknown error';
-          
-      // Fallback to sample data if News API fails
-      const fallbackData = [
-        {
-          title: "Sample News Headline 1",
-          description: "This is a sample news description. The News API might be rate limited or unavailable.",
-          source: "Sample News",
-          url: "#",
-          urlToImage: "https://via.placeholder.com/300x150?text=News+Image",
-          publishedAt: new Date().toISOString()
-        },
-        {
-          title: "Sample News Headline 2",
-          description: "Another sample news description. Please check your internet connection and API key.",
-          source: "Sample News",
-          url: "#",
-          urlToImage: "https://via.placeholder.com/300x150?text=News+Image",
-          publishedAt: new Date().toISOString()
-        }
-      ];
-      
-      if (loadMore) {
-        setHeadlines(prev => [...prev, ...fallbackData]);
-      } else {
-        setHeadlines(fallbackData);
-      }
-      
-      toast({
-        title: "Using Sample Data",
-        description: `Could not connect to news service. ${errorMessage} Using sample data instead.`,
-        variant: "destructive",
-      });
-      
-      console.error('Full error object:', error);
-    } finally {
-      setIsLoadingNews(false);
-    }
-  };
-
   const handleGenerateMeme = async (headline: NewsHeadline) => {
+    if (!headline) return;
+    
     setSelectedHeadline(headline);
     setIsGenerating(true);
+    setCaption('');
+    setCurrentTemplate(getRandomTemplate());
     
     try {
-      let generatedCaption = headline.title;
+      // Generate a caption if none is provided
+      const memeText = caption || headline.title;
       
-      // Try to generate caption via Edge Function, fallback to using the headline
-      try {
-        const { data: captionData, error: captionError } = await supabase.functions
-          .invoke('generate-caption', {
-            body: { text: headline.title, type: 'news' }
-          });
-          
-        if (!captionError && captionData?.caption) {
-          generatedCaption = captionData.caption;
-        }
-      } catch (error) {
-        console.warn('Caption generation failed, using headline as caption');
+      // Use the Imgflip API to generate a meme
+      const formData = new FormData();
+      formData.append('template_id', currentTemplate.id);
+      formData.append('username', import.meta.env.VITE_IMGFLIP_USERNAME || '');
+      formData.append('password', import.meta.env.VITE_IMGFLIP_PASSWORD || '');
+      
+      if (currentTemplate.topText) {
+        formData.append('text0', memeText);
+      }
+      if (currentTemplate.bottomText) {
+        formData.append('text1', memeText);
       }
       
-      setCaption(generatedCaption);
-      
-      // Select a random template
-      const template = getRandomTemplate();
-      setCurrentTemplate(template);
-      
-      // Prepare text for the meme
-      let topText = '';
-      let bottomText = '';
-      
-      if (template.topText && template.bottomText) {
-        // Split the caption for templates with both top and bottom text
-        const words = generatedCaption.split(' ');
-        const midPoint = Math.ceil(words.length / 2);
-        topText = words.slice(0, midPoint).join(' ').substring(0, 50);
-        bottomText = words.slice(midPoint).join(' ').substring(0, 50);
-      } else if (template.topText) {
-        topText = generatedCaption.substring(0, 100);
-      } else {
-        bottomText = generatedCaption.substring(0, 100);
-      }
-
-      // Try to generate meme via Edge Function, fallback to Memegen API
-      try {
-        const { data: memeData, error: memeError } = await supabase.functions.invoke('create-meme', {
-          body: { 
-            topText: topText,
-            bottomText: bottomText,
-            templateId: template.id
-          }
-        });
-
-        if (!memeError && memeData?.memeUrl) {
-          setGeneratedMeme(memeData.memeUrl);
-          toast({
-            title: `${template.name} Meme Generated!`,
-            description: "Your news-based meme is ready",
-          });
-          return;
-        }
-      } catch (error) {
-        console.warn('Meme generation failed, using fallback');
-      }
-      
-      // Fallback to Memegen API
-      const fallbackMemeUrl = `https://api.memegen.link/images/${template.id}/` +
-        `${encodeURIComponent(topText || '_')}/` +
-        `${encodeURIComponent(bottomText || '')}.png`;
-      
-      setGeneratedMeme(fallbackMemeUrl);
-      toast({
-        title: `${template.name} Meme Generated (Demo)`,
-        description: "Using demo meme generation service",
+      const response = await fetch('https://api.imgflip.com/caption_image', {
+        method: 'POST',
+        body: formData
       });
-    } catch (error: any) {
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setGeneratedMeme(data.data.url);
+      } else {
+        throw new Error(data.error_message || 'Failed to generate meme');
+      }
+    } catch (error) {
       console.error('Error generating meme:', error);
       toast({
-        title: "Generation failed",
-        description: error.message || "Failed to generate meme. Please try again.",
+        title: "Error",
+        description: "Failed to generate meme. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -449,13 +272,19 @@ const NewsMeme = () => {
   };
 
   const handleDownload = () => {
-    if (generatedMeme) {
-      window.open(generatedMeme, '_blank');
-      toast({
-        title: "Opening meme",
-        description: "Right-click to save the image",
-      });
-    }
+    if (!generatedMeme) return;
+    
+    const link = document.createElement('a');
+    link.href = generatedMeme;
+    link.download = `meme-${Date.now()}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Download Started",
+      description: "Your meme is being downloaded.",
+    });
   };
 
   const handleRefresh = () => {
@@ -478,9 +307,9 @@ const NewsMeme = () => {
           <div className="w-full md:w-1/2">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-3xl font-bold text-gray-800">Latest News</h1>
-              <Button
-                variant="outline"
-                size="sm"
+              <Button 
+                variant="outline" 
+                size="sm" 
                 onClick={handleRefresh}
                 disabled={isLoading || isLoadingMore}
               >
@@ -501,11 +330,9 @@ const NewsMeme = () => {
             ) : (
               <div className="space-y-6">
                 {headlines.map((headline, index) => (
-                  <Card
+                  <Card 
                     key={`${headline.title}-${index}`}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
-                      selectedHeadline?.title === headline.title ? 'ring-2 ring-blue-500' : ''
-                    }`}
+                    className={`cursor-pointer transition-all hover:shadow-md ${selectedHeadline?.title === headline.title ? 'ring-2 ring-blue-500' : ''}`}
                     onClick={() => setSelectedHeadline(headline)}
                   >
                     <CardHeader>
@@ -525,8 +352,8 @@ const NewsMeme = () => {
 
                 {hasMore && (
                   <div className="flex justify-center mt-6">
-                    <Button
-                      variant="outline"
+                    <Button 
+                      variant="outline" 
                       onClick={handleLoadMore}
                       disabled={isLoadingMore}
                     >
@@ -535,9 +362,7 @@ const NewsMeme = () => {
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Loading...
                         </>
-                      ) : (
-                        'Load More'
-                      )}
+                      ) : 'Load More'}
                     </Button>
                   </div>
                 )}
@@ -550,7 +375,7 @@ const NewsMeme = () => {
             <div className="sticky top-4">
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-6">Meme Generator</h2>
-
+                
                 {!selectedHeadline ? (
                   <div className="text-center py-12">
                     <ImageIcon className="h-12 w-12 mx-auto text-gray-400" />
@@ -584,7 +409,7 @@ const NewsMeme = () => {
                       <select
                         value={currentTemplate.id}
                         onChange={(e) => {
-                          const selected = memeTemplates.find((t) => t.id === e.target.value);
+                          const selected = memeTemplates.find(t => t.id === e.target.value);
                           if (selected) setCurrentTemplate(selected);
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -619,14 +444,14 @@ const NewsMeme = () => {
                       <div className="mt-6">
                         <h3 className="text-sm font-medium text-gray-700 mb-2">Your Meme</h3>
                         <div className="relative">
-                          <img
-                            src={generatedMeme}
-                            alt="Generated meme"
+                          <img 
+                            src={generatedMeme} 
+                            alt="Generated meme" 
                             className="w-full rounded-md border border-gray-200"
                           />
-                          <Button
-                            variant="outline"
-                            size="sm"
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
                             className="absolute top-2 right-2 bg-white/80 hover:bg-white"
                             onClick={handleDownload}
                           >
