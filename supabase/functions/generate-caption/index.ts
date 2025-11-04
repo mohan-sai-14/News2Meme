@@ -21,13 +21,17 @@ serve(async (req) => {
     }
 
     // Create a prompt for generating meme captions
-    const prompt = type === 'news' 
-      ? `Create a funny, witty meme caption for this news headline. Keep it short (max 100 characters), punchy, and internet-humor friendly. Headline: "${text}"`
-      : `Create a hilarious meme caption based on this idea. Keep it short (max 100 characters), punchy, and make it meme-worthy. Idea: "${text}"`;
+    const systemPrompt = type === 'news' 
+      ? 'You are a witty meme caption generator. Create short, punchy, internet-humor friendly captions (max 100 characters).'
+      : 'You are a hilarious meme caption creator. Make captions that are meme-worthy, short and punchy (max 100 characters).';
+    
+    const userPrompt = type === 'news'
+      ? `Make a funny meme caption for this headline: "${text}"`
+      : `Make a hilarious meme caption for: "${text}"`;
 
-    // Use Hugging Face's new router endpoint for text generation
+    // Use Hugging Face's OpenAI-compatible API endpoint
     const response = await fetch(
-      'https://router.huggingface.co/hf-inference/models/mistralai/Mixtral-8x7B-Instruct-v0.1',
+      'https://router.huggingface.co/v1/chat/completions',
       {
         method: 'POST',
         headers: {
@@ -35,12 +39,13 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          inputs: prompt,
-          parameters: {
-            max_new_tokens: 100,
-            temperature: 0.9,
-            top_p: 0.95,
-          },
+          model: 'mistralai/Mixtral-8x7B-Instruct-v0.1',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          max_tokens: 100,
+          temperature: 0.9,
         }),
       }
     );
@@ -55,12 +60,14 @@ serve(async (req) => {
     console.log('Hugging Face response:', result);
 
     let caption = '';
-    if (Array.isArray(result) && result[0]?.generated_text) {
-      caption = result[0].generated_text.replace(prompt, '').trim();
-      // Clean up the caption - take first line or sentence
-      caption = caption.split('\n')[0].split('.')[0].trim();
-      // Remove quotes if present
+    if (result.choices && result.choices[0]?.message?.content) {
+      caption = result.choices[0].message.content.trim();
+      // Clean up the caption - remove quotes if present
       caption = caption.replace(/^["']|["']$/g, '');
+      // Limit length
+      if (caption.length > 100) {
+        caption = caption.substring(0, 97) + '...';
+      }
     } else {
       // Fallback caption
       caption = type === 'news' 
