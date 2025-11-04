@@ -163,33 +163,16 @@ const NewsMeme = () => {
       }
       
       setHasMore(formattedHeadlines.length === pageSize);
-
-        if (loadMore) {
-          setHeadlines(prev => [...prev, ...formattedHeadlines]);
-          setPage(currentPage);
-        } else {
-          setHeadlines(formattedHeadlines);
-        }
-        setHasMore(formattedHeadlines.length === pageSize);
-        return;
-      } catch (error) {
-        console.error('Error in fetchNews:', error);
-        const errorMessage = error instanceof Error 
-          ? error.message 
-          : typeof error === 'string' 
-            ? error 
-            : 'Unknown error';
-            
-        toast({
-          title: "Error Loading News",
-          description: `Failed to load news. ${errorMessage}`,
-          variant: "destructive"
-        });
-        
-        console.error('Full error object:', error);
-        // Fall through to sample data
-      }
+      return;
       
+    } catch (error) {
+      console.error('Error in fetchNews:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'string' 
+          ? error 
+          : 'Unknown error';
+          
       // Fallback to sample data if News API fails
       const fallbackData = [
         {
@@ -215,14 +198,14 @@ const NewsMeme = () => {
       } else {
         setHeadlines(fallbackData);
       }
-    } catch (error) {
-      console.error('Error in fetchNews:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
       toast({
         title: "Using Sample Data",
         description: `Could not connect to news service. ${errorMessage} Using sample data instead.`,
         variant: "destructive",
       });
+      
+      console.error('Full error object:', error);
     } finally {
       setIsLoadingNews(false);
     }
