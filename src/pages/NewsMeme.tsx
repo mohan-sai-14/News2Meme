@@ -55,8 +55,18 @@ const NewsMeme = () => {
   }, []);
 
   const fetchNews = async (loadMore = false) => {
-    const GNEWS_API_KEY = 'b20d1f391ec85532c8a6926c208a19f0';
+    const GNEWS_API_KEY = import.meta.env.VITE_GNEWS_API_KEY;
     
+    if (!GNEWS_API_KEY) {
+      console.error('GNews API key is not set');
+      toast({
+        title: "Configuration Error",
+        description: "News API key is not configured",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (loadMore) {
       setIsLoadingMore(true);
     } else {
@@ -74,7 +84,7 @@ const NewsMeme = () => {
       const pageSize = 6; // Number of articles per page
 
       // Build the GNews API URL
-      let apiUrl = `https://gnews.io/api/v4/top-headlines?token=${GNEWS_API_KEY}&lang=en&max=${pageSize}&page=${currentPage}`;
+      let apiUrl = `https://gnews.io/api/v4/top-headlines?apikey=${GNEWS_API_KEY}&lang=en&max=${pageSize}&page=${currentPage}`;
       
       // Add filters if provided
       if (searchQuery) {
@@ -88,15 +98,30 @@ const NewsMeme = () => {
       }
 
       try {
+        console.log('Fetching news from:', apiUrl.replace(GNEWS_API_KEY, '***'));
         const response = await fetch(apiUrl);
-        const data = await response.json();
+        const responseText = await response.text();
+        let data;
+        
+        try {
+          data = JSON.parse(responseText);
+          console.log('API Response:', data);
+        } catch (e) {
+          console.error('Failed to parse API response:', responseText);
+          throw new Error('Invalid response from news API');
+        }
 
-        if (data.articles) {
+        if (!response.ok) {
+          console.error('API Error Response:', data);
+          throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        }
+
+        if (data && Array.isArray(data.articles)) {
           const formattedHeadlines = data.articles.map((article: any) => ({
             title: article.title || 'No title available',
             description: article.description || 'No description available',
             source: article.source?.name || 'Unknown source',
-            url: article.url || '#',
+            url: article.url || article.source?.url || '#',
             urlToImage: article.image || article.urlToImage || 'https://via.placeholder.com/300x150?text=No+Image',
             publishedAt: article.publishedAt || new Date().toISOString()
           }));
@@ -111,10 +136,17 @@ const NewsMeme = () => {
           }
           return;
         } else {
-          throw new Error(data.message || data.errors?.[0]?.message || 'Failed to fetch news');
+          const errorMsg = data.message || data.errors?.[0]?.message || 'No articles found';
+          console.error('API Error:', errorMsg);
+          throw new Error(errorMsg);
         }
       } catch (error) {
         console.error('Error fetching from News API:', error);
+        toast({
+          title: "Error",
+          description: `Failed to load news: ${error.message}`,
+          variant: "destructive"
+        });
         // Fall through to sample data
       }
       
