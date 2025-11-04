@@ -78,25 +78,28 @@ const NewsMeme = () => {
       if (searchQuery) {
         apiUrl += `&q=${encodeURIComponent(searchQuery)}`;
       }
-      if (category && category !== 'all') {
-        apiUrl += `&category=${category}`;
+      if (category && category !== 'all' && category !== 'All') {
+        apiUrl += `&category=${category.toLowerCase()}`;
       }
       if (country) {
-        apiUrl += `&country=${country}`;
+        apiUrl += `&country=${country.toLowerCase()}`;
       }
 
       try {
         console.log('Fetching news from:', apiUrl);
-        const response = await fetch(apiUrl);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('API Error Response:', errorData);
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
+        const response = await fetch(apiUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
         
         const data = await response.json();
         console.log('API Response:', data);
+
+        if (!response.ok) {
+          console.error('API Error Response:', data);
+          throw new Error(data.error || `HTTP error! status: ${response.status}`);
+        }
 
         if (data && Array.isArray(data.articles)) {
           const formattedHeadlines = data.articles.map((article: any) => ({
