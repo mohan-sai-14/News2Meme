@@ -85,8 +85,10 @@ const NewsMeme = () => {
         apiUrl += `&country=${country.toLowerCase()}`;
       }
 
+      console.log('Fetching news from:', apiUrl);
+
       try {
-        console.log('Fetching news from:', apiUrl);
+        console.log('Making API request to:', apiUrl);
         const response = await fetch(apiUrl, {
           headers: {
             'Accept': 'application/json',
@@ -94,46 +96,62 @@ const NewsMeme = () => {
           },
         });
         
+        let responseData;
+        try {
+          responseData = await response.json();
+          console.log('API Response:', responseData);
+        } catch (jsonError) {
+          console.error('Failed to parse JSON response:', jsonError);
+          const textResponse = await response.text();
+          console.error('Raw response:', textResponse);
+          throw new Error(`Invalid JSON response: ${textResponse.substring(0, 200)}`);
+        }
+
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('API Error Response:', errorData);
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+          console.error('API Error Response:', responseData);
+          const errorMessage = typeof responseData === 'object' 
+            ? (responseData.error || responseData.message || 'Unknown error')
+            : String(responseData);
+          throw new Error(`API Error: ${errorMessage} (Status: ${response.status})`);
         }
 
-        const data = await response.json();
-        console.log('API Response:', data);
+        if (!responseData || !Array.isArray(responseData.articles)) {
+          console.error('Invalid response format:', responseData);
+          throw new Error('Invalid response format from server');
+        }
 
-        if (data && Array.isArray(data.articles)) {
-          const formattedHeadlines = data.articles.map((article: any) => ({
-            title: article.title || 'No title available',
-            description: article.description || 'No description available',
-            source: article.source?.name || 'Unknown source',
-            url: article.url || article.source?.url || '#',
-            urlToImage: article.urlToImage || 'https://via.placeholder.com/300x150?text=No+Image',
-            publishedAt: article.publishedAt || new Date().toISOString()
-          }));
+        const formattedHeadlines = responseData.articles.map((article: any) => ({
+          title: article.title || 'No title available',
+          description: article.description || 'No description available',
+          source: article.source?.name || 'Unknown source',
+          url: article.url || article.source?.url || '#',
+          urlToImage: article.urlToImage || 'https://via.placeholder.com/300x150?text=No+Image',
+          publishedAt: article.publishedAt || new Date().toISOString()
+        }));
 
-          if (loadMore) {
-            setHeadlines(prev => [...prev, ...formattedHeadlines]);
-            setPage(currentPage);
-            setHasMore(formattedHeadlines.length === pageSize);
-          } else {
-            setHeadlines(formattedHeadlines);
-            setHasMore(formattedHeadlines.length === pageSize);
-          }
-          return;
+        if (loadMore) {
+          setHeadlines(prev => [...prev, ...formattedHeadlines]);
+          setPage(currentPage);
         } else {
-          const errorMsg = data.message || data.errors?.[0]?.message || 'No articles found';
-          console.error('API Error:', errorMsg);
-          throw new Error(errorMsg);
+          setHeadlines(formattedHeadlines);
         }
+        setHasMore(formattedHeadlines.length === pageSize);
+        return;
       } catch (error) {
-        console.error('Error fetching from News API:', error);
+        console.error('Error in fetchNews:', error);
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : typeof error === 'string' 
+            ? error 
+            : 'Unknown error';
+            
         toast({
-          title: "Error",
-          description: `Failed to load news: ${error.message}`,
+          title: "Error Loading News",
+          description: `Failed to load news. ${errorMessage}`,
           variant: "destructive"
         });
+        
+        console.error('Full error object:', error);
         // Fall through to sample data
       }
       
