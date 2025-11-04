@@ -94,7 +94,10 @@ const NewsMeme = () => {
       const pageSize = 6; // Number of articles per page
 
       // Build our API URL
-      let apiUrl = `/api/news?page=${currentPage}&pageSize=${pageSize}`;
+      const baseUrl = import.meta.env.PROD 
+        ? 'https://news2meme.vercel.app' 
+        : '';
+      let apiUrl = `${baseUrl}/api/news?page=${currentPage}&pageSize=${pageSize}`;
       
       // Add filters if provided
       if (searchQuery) {
@@ -109,6 +112,8 @@ const NewsMeme = () => {
 
       console.log('Fetching news from:', apiUrl);
       
+      console.log('Making API request to:', apiUrl);
+      console.log('Making API request to:', apiUrl);
       const response = await fetch(apiUrl, {
         headers: {
           'Accept': 'application/json',
@@ -116,18 +121,30 @@ const NewsMeme = () => {
         },
       });
       
+      const responseText = await response.text();
+      console.log('API Response Status:', response.status);
+      console.log('API Response Text:', responseText);
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || 
-          errorData.error?.message || 
-          `HTTP error! status: ${response.status}`
-        );
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+          console.error('API Error:', errorData);
+          throw new Error(
+            errorData.message || 
+            errorData.error?.message || 
+            `API request failed with status ${response.status}`
+          );
+        } catch (e) {
+          console.error('Failed to parse error response:', e);
+          throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
+        }
       }
       
-      const data = await response.json();
+      const data = JSON.parse(responseText);
       
       if (!data.articles || !Array.isArray(data.articles)) {
+        console.error('Invalid response format:', data);
         throw new Error('Invalid response format from server');
       }
 
