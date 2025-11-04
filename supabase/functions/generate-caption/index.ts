@@ -25,9 +25,9 @@ serve(async (req) => {
       ? `Create a funny, witty meme caption for this news headline. Keep it short (max 100 characters), punchy, and internet-humor friendly. Headline: "${text}"`
       : `Create a hilarious meme caption based on this idea. Keep it short (max 100 characters), punchy, and make it meme-worthy. Idea: "${text}"`;
 
-    // Use Hugging Face's text generation API
+    // Use Hugging Face's new router endpoint for text generation
     const response = await fetch(
-      'https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1',
+      'https://router.huggingface.co/hf-inference/models/mistralai/Mixtral-8x7B-Instruct-v0.1',
       {
         method: 'POST',
         headers: {
