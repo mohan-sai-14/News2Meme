@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Newspaper, Loader2, Sparkles, Download, RefreshCw, Image as ImageIcon } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface NewsHeadline {
@@ -17,21 +17,44 @@ interface NewsHeadline {
   publishedAt: string;
 }
 
+interface Article {
+  title: string;
+  description: string;
+  source: string;
+  url: string;
+  urlToImage: string;
+  publishedAt: string;
+}
+
+// Move getRandomTemplate function before the component
+const getRandomTemplate = () => {
+  const memeTemplates = [
+    { id: '181913649', name: 'Drake Hotline Bling', topText: true, bottomText: true },
+    { id: '87743020', name: 'Two Buttons', topText: true, bottomText: true },
+    { id: '112126428', name: 'Distracted Boyfriend', topText: true, bottomText: true },
+    { id: '131087935', name: 'Running Away Balloon', topText: true, bottomText: false },
+    { id: '124822590', name: 'Left Exit 12 Off Ramp', topText: true, bottomText: true },
+    { id: '247375501', name: 'Buff Doge vs. Cheems', topText: true, bottomText: true },
+  ];
+  return memeTemplates[Math.floor(Math.random() * memeTemplates.length)];
+};
+
 const NewsMeme = () => {
-  const [headlines, setHeadlines] = useState<NewsHeadline[]>([]);
-  const [isLoadingNews, setIsLoadingNews] = useState(true);
+  const [headlines, setHeadlines] = useState<Article[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [selectedHeadline, setSelectedHeadline] = useState<NewsHeadline | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedMeme, setGeneratedMeme] = useState<string | null>(null);
-  const [caption, setCaption] = useState("");
-  const [currentTemplate, setCurrentTemplate] = useState<{id: string, name: string} | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [selectedHeadline, setSelectedHeadline] = useState<Article | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [caption, setCaption] = useState('');
+  const [currentTemplate, setCurrentTemplate] = useState(getRandomTemplate());
+  const [generatedMeme, setGeneratedMeme] = useState('');
   const itemsPerPage = 6;
+  const { toast } = useToast();
 
-  // Popular meme templates with their IDs and text configurations
-  const memeTemplates = [
+  // Memoize the meme templates to prevent recreation on every render
+  const memeTemplates = useMemo(() => [
     { id: '181913649', name: 'Drake Hotline Bling', topText: true, bottomText: true },
     { id: '87743020', name: 'Two Buttons', topText: true, bottomText: true },
     { id: '112126428', name: 'Distracted Boyfriend', topText: true, bottomText: true },
@@ -42,12 +65,7 @@ const NewsMeme = () => {
     { id: '102156234', name: 'Mocking Spongebob', topText: true, bottomText: false },
     { id: '93895088', name: 'Expanding Brain', topText: true, bottomText: false },
     { id: '155067746', name: 'Surprised Pikachu', topText: true, bottomText: false }
-  ];
-
-  // Get a random meme template
-  const getRandomTemplate = () => {
-    return memeTemplates[Math.floor(Math.random() * memeTemplates.length)];
-  };
+  ], []);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -55,20 +73,24 @@ const NewsMeme = () => {
   }, []);
 
   const fetchNews = async (loadMore = false) => {
-    if (loadMore) {
-      setIsLoadingMore(true);
-    } else {
-      setIsLoadingNews(true);
-      setPage(1);
-    }
+    const currentPage = loadMore ? page + 1 : 1;
+    
+    // Don't fetch more if we're already loading or have no more to load
+    if ((loadMore && (!hasMore || isLoadingMore)) || isLoading) return;
 
     try {
+      // Set loading state
+      if (loadMore) {
+        setIsLoadingMore(true);
+      } else {
+        setIsLoading(true);
+      }
+
       // Get URL parameters for filters
       const urlParams = new URLSearchParams(window.location.search);
       const searchQuery = urlParams.get('q') || '';
       const category = urlParams.get('category') || 'all';
       const country = urlParams.get('country') || 'us';
-      const currentPage = loadMore ? page + 1 : 1;
       const pageSize = 6; // Number of articles per page
 
       // Build our API URL
@@ -86,48 +108,47 @@ const NewsMeme = () => {
       }
 
       console.log('Fetching news from:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || 
+          errorData.error?.message || 
+          `HTTP error! status: ${response.status}`
+        );
+      }
+      
+      const data = await response.json();
+      
+      if (!data.articles || !Array.isArray(data.articles)) {
+        throw new Error('Invalid response format from server');
+      }
 
-      try {
-        console.log('Making API request to:', apiUrl);
-        const response = await fetch(apiUrl, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        let responseData;
-        try {
-          responseData = await response.json();
-          console.log('API Response:', responseData);
-        } catch (jsonError) {
-          console.error('Failed to parse JSON response:', jsonError);
-          const textResponse = await response.text();
-          console.error('Raw response:', textResponse);
-          throw new Error(`Invalid JSON response: ${textResponse.substring(0, 200)}`);
-        }
+      // Process the articles
+      const formattedHeadlines = data.articles.map(article => ({
+        title: article.title || 'No title available',
+        description: article.description || 'No description available',
+        source: article.source?.name || 'Unknown source',
+        url: article.url || article.source?.url || '#',
+        urlToImage: article.urlToImage || 'https://via.placeholder.com/300x150?text=No+Image',
+        publishedAt: article.publishedAt || new Date().toISOString()
+      }));
 
-        if (!response.ok) {
-          console.error('API Error Response:', responseData);
-          const errorMessage = typeof responseData === 'object' 
-            ? (responseData.error || responseData.message || 'Unknown error')
-            : String(responseData);
-          throw new Error(`API Error: ${errorMessage} (Status: ${response.status})`);
-        }
-
-        if (!responseData || !Array.isArray(responseData.articles)) {
-          console.error('Invalid response format:', responseData);
-          throw new Error('Invalid response format from server');
-        }
-
-        const formattedHeadlines = responseData.articles.map((article: any) => ({
-          title: article.title || 'No title available',
-          description: article.description || 'No description available',
-          source: article.source?.name || 'Unknown source',
-          url: article.url || article.source?.url || '#',
-          urlToImage: article.urlToImage || 'https://via.placeholder.com/300x150?text=No+Image',
-          publishedAt: article.publishedAt || new Date().toISOString()
-        }));
+      if (loadMore) {
+        setHeadlines(prev => [...prev, ...formattedHeadlines]);
+        setPage(currentPage);
+      } else {
+        setHeadlines(formattedHeadlines);
+      }
+      
+      setHasMore(formattedHeadlines.length === pageSize);
 
         if (loadMore) {
           setHeadlines(prev => [...prev, ...formattedHeadlines]);
