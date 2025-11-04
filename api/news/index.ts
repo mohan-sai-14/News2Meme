@@ -40,23 +40,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (country) apiUrl.searchParams.append('country', String(country).toLowerCase());
 
     console.log('Fetching from GNews API:', apiUrl.toString());
-    const response = await fetch(apiUrl.toString());
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('GNews API Error:', errorText);
-      return res.status(response.status).json({ 
-        error: 'Failed to fetch news from GNews API',
-        status: response.status,
-        details: errorText
+    try {
+      const response = await fetch(apiUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'News2Meme/1.0'
+        }
       });
-    }
-
-    const data = await response.json();
-    
-    // Transform the response to match our frontend's expected format
-    const formattedData = {
-      articles: data.articles?.map((article: any) => ({
+      
+      const data = await response.json();
+      console.log('GNews API Response:', { 
+        status: response.status, 
+        statusText: response.statusText,
+        hasArticles: !!data.articles,
+        articleCount: data.articles?.length || 0
+      });
+      
+      if (!response.ok) {
+        console.error('GNews API Error:', data);
+        return res.status(response.status).json({ 
+          error: data.message || 'Failed to fetch news from GNews API',
+          status: response.status,
+          details: data
+        });
+      }
+      
+      // Transform the response to match our frontend's expected format
+      const formattedData = {
+        articles: data.articles?.map((article: any) => ({
         title: article.title || 'No title available',
         description: article.description || 'No description available',
         source: {
