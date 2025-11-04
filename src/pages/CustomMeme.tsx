@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Sparkles, Download } from "lucide-react";
+import { Loader2, Sparkles, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -11,6 +12,7 @@ const CustomMeme = () => {
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedMeme, setGeneratedMeme] = useState<string | null>(null);
+  const [caption, setCaption] = useState("");
   const { toast } = useToast();
 
   const handleGenerate = async () => {
@@ -25,22 +27,53 @@ const CustomMeme = () => {
 
     setIsGenerating(true);
     
-    // Simulate meme generation (will be replaced with actual AI integration)
-    setTimeout(() => {
-      setGeneratedMeme("https://images.unsplash.com/photo-1649972904349-6e44c42644a7");
-      setIsGenerating(false);
+    try {
+      // Step 1: Generate AI caption
+      const { data: captionData, error: captionError } = await supabase.functions.invoke('generate-caption', {
+        body: { text: input, type: 'custom' }
+      });
+
+      if (captionError) throw captionError;
+      
+      const generatedCaption = captionData.caption;
+      setCaption(generatedCaption);
+
+      // Step 2: Create meme with the caption
+      const { data: memeData, error: memeError } = await supabase.functions.invoke('create-meme', {
+        body: { 
+          topText: generatedCaption.slice(0, 50),
+          bottomText: generatedCaption.length > 50 ? generatedCaption.slice(50, 100) : '',
+          templateId: '181913649' // Drake meme template
+        }
+      });
+
+      if (memeError) throw memeError;
+
+      setGeneratedMeme(memeData.memeUrl);
       toast({
         title: "Meme generated!",
         description: "Your AI-powered meme is ready",
       });
-    }, 2000);
+    } catch (error: any) {
+      console.error('Error generating meme:', error);
+      toast({
+        title: "Generation failed",
+        description: error.message || "Failed to generate meme. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleDownload = () => {
-    toast({
-      title: "Download started",
-      description: "Your meme is being downloaded",
-    });
+    if (generatedMeme) {
+      window.open(generatedMeme, '_blank');
+      toast({
+        title: "Opening meme",
+        description: "Right-click to save the image",
+      });
+    }
   };
 
   return (
@@ -107,6 +140,11 @@ const CustomMeme = () => {
             <Card className="shadow-medium">
               <CardHeader>
                 <CardTitle>Your Generated Meme</CardTitle>
+                {caption && (
+                  <CardDescription className="text-base font-medium">
+                    Caption: {caption}
+                  </CardDescription>
+                )}
               </CardHeader>
               <CardContent>
                 {isGenerating ? (
@@ -122,7 +160,7 @@ const CustomMeme = () => {
                       <img 
                         src={generatedMeme} 
                         alt="Generated meme" 
-                        className="w-full aspect-square object-cover"
+                        className="w-full h-auto"
                       />
                     </div>
                     <div className="flex gap-4">
@@ -137,11 +175,12 @@ const CustomMeme = () => {
                       <Button 
                         onClick={() => {
                           setGeneratedMeme(null);
-                          setInput("");
+                          setCaption("");
                         }}
                         variant="outline"
-                        className="flex-1"
+                        className="gap-2"
                       >
+                        <RefreshCw className="w-4 h-4" />
                         Create Another
                       </Button>
                     </div>
