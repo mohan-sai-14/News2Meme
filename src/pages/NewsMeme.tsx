@@ -51,8 +51,6 @@ const NewsMeme = () => {
   const [currentTemplate, setCurrentTemplate] = useState(getRandomTemplate());
   const [generatedMeme, setGeneratedMeme] = useState('');
   const itemsPerPage = 6;
-  const { toast } = useToast();
-
   // Memoize the meme templates to prevent recreation on every render
   const memeTemplates = useMemo(() => [
     { id: '181913649', name: 'Drake Hotline Bling', topText: true, bottomText: true },
@@ -66,7 +64,6 @@ const NewsMeme = () => {
     { id: '93895088', name: 'Expanding Brain', topText: true, bottomText: false },
     { id: '155067746', name: 'Surprised Pikachu', topText: true, bottomText: false }
   ], []);
-  const { toast } = useToast();
 
   useEffect(() => {
     fetchNews();
@@ -219,11 +216,12 @@ const NewsMeme = () => {
         setHeadlines(fallbackData);
       }
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error in fetchNews:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Using Sample Data",
-        description: error?.message || "Could not connect to news service. Using sample data instead.",
+        description: `Could not connect to news service. ${errorMessage} Using sample data instead.`,
         variant: "destructive",
       });
     } finally {
