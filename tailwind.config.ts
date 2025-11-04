@@ -13,6 +13,34 @@ export default {
       },
     },
     extend: {
+      animation: {
+        'fade-in': 'fadeIn 0.5s ease-in-out',
+        'float': 'float 6s ease-in-out infinite',
+        'pulse-slow': 'pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'gradient': 'gradient 8s ease infinite',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0) translateZ(0)' },
+          '50%': { transform: 'translateY(-20px) translateZ(0)' },
+        },
+        gradient: {
+          '0%, 100%': { 'background-position': '0% 50%' },
+          '50%': { 'background-position': '100% 50%' },
+        },
+      },
+      backgroundImage: {
+        'gradient-hero': 'linear-gradient(90deg, hsl(var(--primary)) 0%, #8b5cf6 35%, #ec4899 100%)',
+      },
+      boxShadow: {
+        'soft': '0 4px 24px rgba(0, 0, 0, 0.05)',
+        'glow': '0 0 20px 5px rgba(99, 102, 241, 0.3)',
+        'large': '0 10px 30px -10px rgba(0, 0, 0, 0.1)',
+      },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         heading: ['Poppins', 'system-ui', 'sans-serif'],
@@ -23,6 +51,10 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        hero: {
+          DEFAULT: 'hsl(var(--hero))',
+          foreground: 'hsl(var(--hero-foreground))',
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

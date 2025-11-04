@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Newspaper, Loader2, Sparkles, Download, RefreshCw } from "lucide-react";
+import { Newspaper, Loader2, Sparkles, Download, RefreshCw, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,29 +20,135 @@ interface NewsHeadline {
 const NewsMeme = () => {
   const [headlines, setHeadlines] = useState<NewsHeadline[]>([]);
   const [isLoadingNews, setIsLoadingNews] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [selectedHeadline, setSelectedHeadline] = useState<NewsHeadline | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedMeme, setGeneratedMeme] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
+  const [currentTemplate, setCurrentTemplate] = useState<{id: string, name: string} | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const itemsPerPage = 6;
+
+  // Popular meme templates with their IDs and text configurations
+  const memeTemplates = [
+    { id: '181913649', name: 'Drake Hotline Bling', topText: true, bottomText: true },
+    { id: '87743020', name: 'Two Buttons', topText: true, bottomText: true },
+    { id: '112126428', name: 'Distracted Boyfriend', topText: true, bottomText: true },
+    { id: '131087935', name: 'Running Away Balloon', topText: true, bottomText: false },
+    { id: '124822590', name: 'Left Exit 12 Off Ramp', topText: true, bottomText: true },
+    { id: '247375501', name: 'Buff Doge vs. Cheems', topText: true, bottomText: true },
+    { id: '129242737', name: 'Change My Mind', topText: false, bottomText: true },
+    { id: '102156234', name: 'Mocking Spongebob', topText: true, bottomText: false },
+    { id: '93895088', name: 'Expanding Brain', topText: true, bottomText: false },
+    { id: '155067746', name: 'Surprised Pikachu', topText: true, bottomText: false }
+  ];
+
+  // Get a random meme template
+  const getRandomTemplate = () => {
+    return memeTemplates[Math.floor(Math.random() * memeTemplates.length)];
+  };
   const { toast } = useToast();
 
   useEffect(() => {
     fetchNews();
   }, []);
 
-  const fetchNews = async () => {
-    setIsLoadingNews(true);
+  const fetchNews = async (loadMore = false) => {
+    const GNEWS_API_KEY = 'b20d1f391ec85532c8a6926c208a19f0';
+    
+    if (loadMore) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoadingNews(true);
+      setPage(1);
+    }
+
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-news');
+      // Get URL parameters for filters
+      const urlParams = new URLSearchParams(window.location.search);
+      const searchQuery = urlParams.get('q') || '';
+      const category = urlParams.get('category') || 'general';
+      const country = urlParams.get('country') || 'us';
+      const currentPage = loadMore ? page + 1 : 1;
+      const pageSize = 6; // Number of articles per page
+
+      // Build the GNews API URL
+      let apiUrl = `https://gnews.io/api/v4/top-headlines?token=${GNEWS_API_KEY}&lang=en&max=${pageSize}&page=${currentPage}`;
       
-      if (error) throw error;
+      // Add filters if provided
+      if (searchQuery) {
+        apiUrl += `&q=${encodeURIComponent(searchQuery)}`;
+      }
+      if (category && category !== 'all') {
+        apiUrl += `&category=${category}`;
+      }
+      if (country) {
+        apiUrl += `&country=${country}`;
+      }
+
+      try {
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        if (data.articles) {
+          const formattedHeadlines = data.articles.map((article: any) => ({
+            title: article.title || 'No title available',
+            description: article.description || 'No description available',
+            source: article.source?.name || 'Unknown source',
+            url: article.url || '#',
+            urlToImage: article.image || article.urlToImage || 'https://via.placeholder.com/300x150?text=No+Image',
+            publishedAt: article.publishedAt || new Date().toISOString()
+          }));
+
+          if (loadMore) {
+            setHeadlines(prev => [...prev, ...formattedHeadlines]);
+            setPage(currentPage);
+            setHasMore(formattedHeadlines.length === pageSize);
+          } else {
+            setHeadlines(formattedHeadlines);
+            setHasMore(formattedHeadlines.length === pageSize);
+          }
+          return;
+        } else {
+          throw new Error(data.message || data.errors?.[0]?.message || 'Failed to fetch news');
+        }
+      } catch (error) {
+        console.error('Error fetching from News API:', error);
+        // Fall through to sample data
+      }
       
-      setHeadlines(data.headlines || []);
+      // Fallback to sample data if News API fails
+      const fallbackData = [
+        {
+          title: "Sample News Headline 1",
+          description: "This is a sample news description. The News API might be rate limited or unavailable.",
+          source: "Sample News",
+          url: "#",
+          urlToImage: "https://via.placeholder.com/300x150?text=News+Image",
+          publishedAt: new Date().toISOString()
+        },
+        {
+          title: "Sample News Headline 2",
+          description: "Another sample news description. Please check your internet connection and API key.",
+          source: "Sample News",
+          url: "#",
+          urlToImage: "https://via.placeholder.com/300x150?text=News+Image",
+          publishedAt: new Date().toISOString()
+        }
+      ];
+      
+      if (loadMore) {
+        setHeadlines(prev => [...prev, ...fallbackData]);
+      } else {
+        setHeadlines(fallbackData);
+      }
+      
     } catch (error: any) {
-      console.error('Error fetching news:', error);
+      console.error('Error in fetchNews:', error);
       toast({
-        title: "Failed to load news",
-        description: error.message || "Could not fetch trending headlines",
+        title: "Using Sample Data",
+        description: error?.message || "Could not connect to news service. Using sample data instead.",
         variant: "destructive",
       });
     } finally {
@@ -54,31 +161,75 @@ const NewsMeme = () => {
     setIsGenerating(true);
     
     try {
-      // Step 1: Generate AI caption from headline
-      const { data: captionData, error: captionError } = await supabase.functions.invoke('generate-caption', {
-        body: { text: headline.title, type: 'news' }
-      });
-
-      if (captionError) throw captionError;
+      let generatedCaption = headline.title;
       
-      const generatedCaption = captionData.caption;
-      setCaption(generatedCaption);
-
-      // Step 2: Create meme with the caption
-      const { data: memeData, error: memeError } = await supabase.functions.invoke('create-meme', {
-        body: { 
-          topText: generatedCaption.slice(0, 50),
-          bottomText: generatedCaption.length > 50 ? generatedCaption.slice(50, 100) : '',
-          templateId: '181913649' // Drake meme template
+      // Try to generate caption via Edge Function, fallback to using the headline
+      try {
+        const { data: captionData, error: captionError } = await supabase.functions
+          .invoke('generate-caption', {
+            body: { text: headline.title, type: 'news' }
+          });
+          
+        if (!captionError && captionData?.caption) {
+          generatedCaption = captionData.caption;
         }
-      });
+      } catch (error) {
+        console.warn('Caption generation failed, using headline as caption');
+      }
+      
+      setCaption(generatedCaption);
+      
+      // Select a random template
+      const template = getRandomTemplate();
+      setCurrentTemplate(template);
+      
+      // Prepare text for the meme
+      let topText = '';
+      let bottomText = '';
+      
+      if (template.topText && template.bottomText) {
+        // Split the caption for templates with both top and bottom text
+        const words = generatedCaption.split(' ');
+        const midPoint = Math.ceil(words.length / 2);
+        topText = words.slice(0, midPoint).join(' ').substring(0, 50);
+        bottomText = words.slice(midPoint).join(' ').substring(0, 50);
+      } else if (template.topText) {
+        topText = generatedCaption.substring(0, 100);
+      } else {
+        bottomText = generatedCaption.substring(0, 100);
+      }
 
-      if (memeError) throw memeError;
+      // Try to generate meme via Edge Function, fallback to Memegen API
+      try {
+        const { data: memeData, error: memeError } = await supabase.functions.invoke('create-meme', {
+          body: { 
+            topText: topText,
+            bottomText: bottomText,
+            templateId: template.id
+          }
+        });
 
-      setGeneratedMeme(memeData.memeUrl);
+        if (!memeError && memeData?.memeUrl) {
+          setGeneratedMeme(memeData.memeUrl);
+          toast({
+            title: `${template.name} Meme Generated!`,
+            description: "Your news-based meme is ready",
+          });
+          return;
+        }
+      } catch (error) {
+        console.warn('Meme generation failed, using fallback');
+      }
+      
+      // Fallback to Memegen API
+      const fallbackMemeUrl = `https://api.memegen.link/images/${template.id}/` +
+        `${encodeURIComponent(topText || '_')}/` +
+        `${encodeURIComponent(bottomText || '')}.png`;
+      
+      setGeneratedMeme(fallbackMemeUrl);
       toast({
-        title: "Meme generated!",
-        description: "Your news-based meme is ready",
+        title: `${template.name} Meme Generated (Demo)`,
+        description: "Using demo meme generation service",
       });
     } catch (error: any) {
       console.error('Error generating meme:', error);
@@ -102,19 +253,49 @@ const NewsMeme = () => {
     }
   };
 
+  const handleRefresh = () => {
+    setHeadlines([]);
+    fetchNews(false);
+  };
+
+  const handleLoadMore = () => {
+    if (!isLoadingMore && hasMore) {
+      fetchNews(true);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
       
-      <main className="flex-1 container px-4 py-12 mx-auto">
-        <div className="max-w-6xl mx-auto space-y-8">
-          <div className="text-center space-y-4">
-            <h1 className="text-4xl md:text-5xl font-heading font-bold">
-              News-Based Memes
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              Generate memes from trending news headlines
-            </p>
+      <main className="flex-1 container px-4 py-8 mx-auto">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="text-center md:text-left space-y-2">
+              <h1 className="text-3xl md:text-4xl font-heading font-bold">
+                News-Based Memes
+              </h1>
+              <p className="text-muted-foreground">
+                Generate memes from trending news headlines
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRefresh}
+                disabled={isLoadingNews}
+                className="gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingNews && !isLoadingMore ? 'animate-spin' : ''}`} />
+                {isLoadingNews && !isLoadingMore ? 'Refreshing...' : 'Refresh News'}
+              </Button>
+              <Link to="/" className="hidden sm:block">
+                <Button variant="outline" size="sm">
+                  Change Filters
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {isLoadingNews ? (
@@ -140,12 +321,29 @@ const NewsMeme = () => {
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="relative rounded-lg overflow-hidden shadow-large">
-                  <img 
-                    src={generatedMeme} 
-                    alt="Generated meme" 
-                    className="w-full h-auto"
-                  />
+                <div className="space-y-4">
+                  {currentTemplate && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <ImageIcon className="w-4 h-4" />
+                      <span>Template: {currentTemplate.name}</span>
+                    </div>
+                  )}
+                  <div className="relative rounded-lg overflow-hidden shadow-large border">
+                    <img 
+                      src={generatedMeme} 
+                      alt="Generated meme" 
+                      className="w-full h-auto"
+                    />
+                  </div>
+                  <Button 
+                    onClick={() => handleGenerateMeme(selectedHeadline!)} 
+                    variant="outline" 
+                    className="w-full gap-2"
+                    disabled={isGenerating}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                    {isGenerating ? 'Generating...' : 'Try Different Template'}
+                  </Button>
                 </div>
                 <div className="flex gap-4">
                   <Button 
@@ -219,6 +417,31 @@ const NewsMeme = () => {
                   </CardContent>
                 </Card>
               ))}
+              
+              {/* Load More Button */}
+              <div className="col-span-full flex justify-center mt-6">
+                {hasMore ? (
+                  <Button 
+                    onClick={handleLoadMore} 
+                    disabled={isLoadingMore}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More Headlines'
+                    )}
+                  </Button>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    No more headlines to load
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>

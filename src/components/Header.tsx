@@ -14,9 +14,6 @@ const Header = () => {
         </Link>
 
         <div className="flex items-center gap-4">
-          <Link to="/gallery">
-            <Button variant="ghost">Gallery</Button>
-          </Link>
           <Link to="/about">
             <Button variant="ghost">About</Button>
           </Link>
