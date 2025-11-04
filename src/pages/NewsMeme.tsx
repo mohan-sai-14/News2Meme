@@ -215,7 +215,6 @@ const NewsMeme = () => {
       } else {
         setHeadlines(fallbackData);
       }
-      
     } catch (error) {
       console.error('Error in fetchNews:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
