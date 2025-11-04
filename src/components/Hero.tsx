@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Zap, Search, Globe, Filter } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -40,6 +40,7 @@ const Hero = () => {
   const [selectedCountry, setSelectedCountry] = useState("us");
   const [showFilters, setShowFilters] = useState(false);
   const [filtersSubmitted, setFiltersSubmitted] = useState(false);
+  const navigate = useNavigate();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,8 +48,8 @@ const Hero = () => {
       setFiltersSubmitted(true);
       setShowFilters(true);
     } else {
-      // Navigate to news-meme with filters
-      window.location.href = `/news-meme?q=${encodeURIComponent(searchQuery)}&category=${selectedCategory}&country=${selectedCountry}`;
+      // Navigate to news-meme with filters using React Router
+      navigate(`/news-meme?q=${encodeURIComponent(searchQuery)}&category=${selectedCategory}&country=${selectedCountry}`);
     }
   };
   return (
