@@ -55,18 +55,6 @@ const NewsMeme = () => {
   }, []);
 
   const fetchNews = async (loadMore = false) => {
-    const GNEWS_API_KEY = import.meta.env.VITE_GNEWS_API_KEY;
-    
-    if (!GNEWS_API_KEY) {
-      console.error('GNews API key is not set');
-      toast({
-        title: "Configuration Error",
-        description: "News API key is not configured",
-        variant: "destructive"
-      });
-      return;
-    }
-
     if (loadMore) {
       setIsLoadingMore(true);
     } else {
@@ -78,13 +66,13 @@ const NewsMeme = () => {
       // Get URL parameters for filters
       const urlParams = new URLSearchParams(window.location.search);
       const searchQuery = urlParams.get('q') || '';
-      const category = urlParams.get('category') || 'general';
+      const category = urlParams.get('category') || 'all';
       const country = urlParams.get('country') || 'us';
       const currentPage = loadMore ? page + 1 : 1;
       const pageSize = 6; // Number of articles per page
 
-      // Build the GNews API URL
-      let apiUrl = `https://gnews.io/api/v4/top-headlines?apikey=${GNEWS_API_KEY}&lang=en&max=${pageSize}&page=${currentPage}`;
+      // Build our API URL
+      let apiUrl = `/api/news?page=${currentPage}&pageSize=${pageSize}`;
       
       // Add filters if provided
       if (searchQuery) {
@@ -98,23 +86,17 @@ const NewsMeme = () => {
       }
 
       try {
-        console.log('Fetching news from:', apiUrl.replace(GNEWS_API_KEY, '***'));
+        console.log('Fetching news from:', apiUrl);
         const response = await fetch(apiUrl);
-        const responseText = await response.text();
-        let data;
         
-        try {
-          data = JSON.parse(responseText);
-          console.log('API Response:', data);
-        } catch (e) {
-          console.error('Failed to parse API response:', responseText);
-          throw new Error('Invalid response from news API');
-        }
-
         if (!response.ok) {
-          console.error('API Error Response:', data);
-          throw new Error(data.message || `HTTP error! status: ${response.status}`);
+          const errorData = await response.json().catch(() => ({}));
+          console.error('API Error Response:', errorData);
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
+        
+        const data = await response.json();
+        console.log('API Response:', data);
 
         if (data && Array.isArray(data.articles)) {
           const formattedHeadlines = data.articles.map((article: any) => ({
